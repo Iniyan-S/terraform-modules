@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Redirect output and errors to a log file for debugging
+exec > /var/log/redis-install.log 2>&1
+set -e  # Exit on any error
+
+# Update the system packages
+echo "Updating system packages..."
+sudo apt-get update -y
+sudo apt-get upgrade -y
+
+# Install prerequisites
+echo "Installing build dependencies..."
+sudo apt-get install -y build-essential tcl wget pkg-config
+
+# Define the Redis version
+REDIS_VERSION="7.0.12"
+
+# Download and extract the latest stable version of Redis
+echo "Downloading Redis $REDIS_VERSION..."
+wget http://download.redis.io/releases/redis-$REDIS_VERSION.tar.gz
+tar xzf redis-$REDIS_VERSION.tar.gz
+cd redis-$REDIS_VERSION
+
+# Build Redis
+echo "Building Redis..."
+make
+make test || echo "Some tests failed, but continuing installation."
+sudo make install
+
+# Configure Redis
+echo "Configuring Redis..."
+sudo mkdir -p /etc/redis
+sudo cp redis.conf /etc/redis/
+
+# Update Redis configuration
+sudo sed -i 's/^supervised no/supervised systemd/' /etc/redis/redis.conf
+sudo sed -i 's|^dir ./|dir /var/lib/redis|' /etc/redis/redis.conf
+
+# Create Redis user and data directory
+echo "Setting up Redis user and data directory..."
+sudo adduser --system --group --no-create-home redis || true
+sudo mkdir -p /var/lib/redis
+sudo chown redis:redis /var/lib/redis
+sudo chmod 770 /var/lib/redis
+
+# Create systemd service for Redis
+echo "Creating Redis systemd service..."
+sudo tee /etc/systemd/system/redis.service > /dev/null <<EOL
+[Unit]
+Description=Redis In-Memory Data Store
+After=network.target
+
+[Service]
+User=redis
+Group=redis
+ExecStart=/usr/local/bin/redis-server /etc/redis/redis.conf
+ExecStop=/usr/local/bin/redis-cli shutdown
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+# Reload systemd, start Redis, and enable it
+echo "Starting and enabling Redis service..."
+sudo systemctl daemon-reload
+sudo systemctl start redis
+sudo systemctl enable redis
+
+echo "Redis installation and setup completed successfully."
