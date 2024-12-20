@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # Accept Command Line Arguments
 SKIPVALIDATIONFAILURE=$1
 tfValidate=$2
