@@ -39,3 +39,12 @@ output "nat_gateway_id" {
 #   value       = aws_security_group.ecs_service_sg.id
 # }
 
+output "public_subnet_cidr_blocks" {
+  description = "CIDR blocks of public subnets"
+  value       = aws_subnet.public[*].cidr_block
+}
+
+output "private_subnet_cidr_blocks" {
+  description = "CIDR blocks of private subnets"
+  value       = aws_subnet.private[*].cidr_block
+}

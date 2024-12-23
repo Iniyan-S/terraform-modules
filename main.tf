@@ -110,8 +110,8 @@ module "alb" {
   protocol            = "HTTP"  # Protocol for the ALB
   port                = 80  # Port for ALB to listen on
   tg_type             = "ip"  # Type of target group (use "ip" for Fargate)
-  health_check_path   = "/index.html"  # Path for health checks
-  health_check_port   = "80"  # Port for health checks
+  health_check_path   = "/health"  # Path for health checks
+  health_check_port   = "3000"  # Port for health checks
   
 }
 
@@ -128,11 +128,11 @@ module "ecs_fargate" {
   task_cpu              = "512"
   task_memory           = "1024"
   container_name        = "demo-site-backend-container"
-  container_image       = "nginx:latest"
+  container_image       = "489692785864.dkr.ecr.eu-west-2.amazonaws.com/connectme-backend:latest"
   container_cpu         = 512
   container_memory      = 1024
-  container_port        = 80
-  host_port             = 80
+  container_port        = 3000
+  host_port             = 3000
   security_groups       = [module.ecs_security_group.sg_id]
   subnets               = module.vpc.private_subnets
   max_task_count        = 2
@@ -267,86 +267,159 @@ module "redis_sg" {
   }
 }
 
-module "ecs_security_group" {
-  source      = "./modules/SecurityGroup"
-  name        = "${var.environment}-ecs-service-sg"
-  description = "Allow access to ECS services"
-  vpc_id      = module.vpc.vpc_id
+# module "ecs_security_group" {
+#   source      = "./modules/SecurityGroup"
+#   name        = "${var.environment}-ecs-service-sg"
+#   description = "Allow access to ECS services"
+#   vpc_id      = module.vpc.vpc_id
 
-  ingress_rules = [
-    {
-      description      = "Allow inbound access from ALB on port 80"
-      from_port        = 80
-      to_port          = 80
-      protocol         = "tcp"
-      security_groups  = [module.alb_security_group.sg_id]  # ALB security group ID
-      cidr_blocks      = []  # No CIDR block, only ALB security group
-    },
-    # {
-    #   description      = "Allow inbound access from ALB on port 3000"
-    #   from_port        = 3000
-    #   to_port          = 3000
-    #   protocol         = "tcp"
-    #   security_groups  = [module.alb_security_group.sg_id]  # ALB security group ID
-    #   cidr_blocks      = []  # No CIDR block, only ALB security group
-    # }
-  ]
+#   ingress_rules = [
+#     {
+#       description      = "Allow inbound access from ALB on port 80"
+#       from_port        = 80
+#       to_port          = 80
+#       protocol         = "tcp"
+#       security_groups  = [module.alb_security_group.sg_id]  # ALB security group ID
+#       cidr_blocks      = []  # No CIDR block, only ALB security group
+#     },
+#     # {
+#     #   description      = "Allow inbound access from ALB on port 3000"
+#     #   from_port        = 3000
+#     #   to_port          = 3000
+#     #   protocol         = "tcp"
+#     #   security_groups  = [module.alb_security_group.sg_id]  # ALB security group ID
+#     #   cidr_blocks      = []  # No CIDR block, only ALB security group
+#     # }
+#   ]
 
-  egress_rules = [
-    {
-      description      = "Allow all outbound traffic"
-      from_port        = 0
-      to_port          = 0
-      protocol         = "-1"
-      cidr_blocks      = ["0.0.0.0/0"]
-      ipv6_cidr_blocks = ["::/0"]
-    }
-  ]
+#   egress_rules = [
+#     {
+#       description      = "Allow all outbound traffic"
+#       from_port        = 0
+#       to_port          = 0
+#       protocol         = "-1"
+#       cidr_blocks      = ["0.0.0.0/0"]
+#       ipv6_cidr_blocks = ["::/0"]
+#     }
+#   ]
 
+#   environment = "demo-site"
+
+#   tags = {
+#     Name        = "${var.environment}-ecs-service-sg"
+#     Environment = var.environment
+#   }
+# }
+
+
+# module "alb_security_group" {
+#   source      = "./modules/SecurityGroup"
+#   name        = "${var.environment}-alb-sg"
+#   description = "Controls access to the ALB"
+#   vpc_id      = module.vpc.vpc_id
+
+#   ingress_rules = [
+#     {
+#       description      = "Allow HTTP traffic on port 80"
+#       from_port        = 80
+#       to_port          = 80
+#       protocol         = "tcp"
+#       cidr_blocks      = ["0.0.0.0/0"]  # Allow access from all sources
+#       ipv6_cidr_blocks = []
+#       security_groups  = []
+#     }
+#   ]
+
+#   egress_rules = [
+#     {
+#       description      = "Allow all outbound traffic"
+#       from_port        = 0
+#       to_port          = 0
+#       protocol         = "-1"
+#       cidr_blocks      = ["0.0.0.0/0"]
+#       ipv6_cidr_blocks = ["::/0"]
+#     }
+#   ]
+
+#   environment = "demo-site"
+
+#   tags = {
+#     Name        = "${var.environment}-alb-sg"
+#     Environment = var.environment
+#   }
+# }
+
+module "alb_security_group" {
+  source      = "./Modules/SecurityGroup"
   environment = "demo-site"
+  name        = "${var.environment}-alb-sg"
+  description = "Controls access to the ALB"
+  vpc_id      = module.vpc.vpc_id
+  ingress_rules = []  // No inline ingress rules
+  egress_rules  = []  // No inline egress rules
+  tags = {
+    Name        = "${var.environment}-alb-sg"
+    Environment = var.environment
+  }
+}
 
+module "ecs_security_group" {
+  source      = "./Modules/SecurityGroup"
+  environment = "demo-site"
+  name        = "${var.environment}-ecs-service-sg"
+  description = "Allows access to ECS services"
+  vpc_id      = module.vpc.vpc_id
+  ingress_rules = []  // No inline ingress rules
+  egress_rules  = []  // No inline egress rules
   tags = {
     Name        = "${var.environment}-ecs-service-sg"
     Environment = var.environment
   }
 }
 
+// ALB Security Group: Allow HTTP traffic from public sources
+resource "aws_security_group_rule" "alb_ingress_http" {
+  description       = "Allow HTTP traffic on port 80 from public sources"
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = module.alb_security_group.sg_id
+}
 
-module "alb_security_group" {
-  source      = "./modules/SecurityGroup"
-  name        = "${var.environment}-alb-sg"
-  description = "Controls access to the ALB"
-  vpc_id      = module.vpc.vpc_id
+// ALB Security Group: Allow outbound traffic to ECS on port 3000
+resource "aws_security_group_rule" "alb_egress_to_ecs" {
+  description              = "Allow outbound traffic from ALB to ECS on port 3000"
+  type                     = "egress"
+  from_port                = 3000
+  to_port                  = 3000
+  protocol                 = "tcp"
+  security_group_id        = module.alb_security_group.sg_id
+  source_security_group_id = module.ecs_security_group.sg_id
+}
 
-  ingress_rules = [
-    {
-      description      = "Allow HTTP traffic on port 80"
-      from_port        = 80
-      to_port          = 80
-      protocol         = "tcp"
-      cidr_blocks      = ["0.0.0.0/0"]  # Allow access from all sources
-      ipv6_cidr_blocks = []
-      security_groups  = []
-    }
-  ]
+// ECS Security Group: Allow inbound traffic from ALB on port 3000
+resource "aws_security_group_rule" "ecs_ingress_from_alb" {
+  description              = "Allow inbound traffic from ALB to ECS on port 3000"
+  type                     = "ingress"
+  from_port                = 3000
+  to_port                  = 3000
+  protocol                 = "tcp"
+  security_group_id        = module.ecs_security_group.sg_id
+  source_security_group_id = module.alb_security_group.sg_id
+}
 
-  egress_rules = [
-    {
-      description      = "Allow all outbound traffic"
-      from_port        = 0
-      to_port          = 0
-      protocol         = "-1"
-      cidr_blocks      = ["0.0.0.0/0"]
-      ipv6_cidr_blocks = ["::/0"]
-    }
-  ]
-
-  environment = "demo-site"
-
-  tags = {
-    Name        = "${var.environment}-alb-sg"
-    Environment = var.environment
-  }
+// ECS Security Group: Allow all outbound traffic
+resource "aws_security_group_rule" "ecs_egress_all" {
+  description       = "Allow all outbound traffic from ECS"
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  ipv6_cidr_blocks  = ["::/0"]
+  security_group_id = module.ecs_security_group.sg_id
 }
 
 # ------- SSH Security Group -------
