@@ -350,7 +350,7 @@ module "redis_sg" {
 # }
 
 module "alb_security_group" {
-  source      = "./Modules/SecurityGroup"
+  source      = "./modules/SecurityGroup"
   environment = "demo-site"
   name        = "${var.environment}-alb-sg"
   description = "Controls access to the ALB"
@@ -364,7 +364,7 @@ module "alb_security_group" {
 }
 
 module "ecs_security_group" {
-  source      = "./Modules/SecurityGroup"
+  source      = "./modules/SecurityGroup"
   environment = "demo-site"
   name        = "${var.environment}-ecs-service-sg"
   description = "Allows access to ECS services"
