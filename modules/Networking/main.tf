@@ -1,7 +1,3 @@
-/*==================================================
-      AWS VPC Module: Main Configuration
-===================================================*/
-
 # ------- VPC Creation -------
 resource "aws_vpc" "main" {
   cidr_block                     = var.vpc_cidr
